@@ -1,0 +1,68 @@
+// =======================
+// Program
+// =======================
+prog: func*
+
+// =======================
+// Functions
+// =======================
+func: id "(" id ("," id)*  ")" "{" [ ("var" id ";")* ] stmt_list "return" exp ";" "}"
+
+// =======================
+// Statements
+// =======================
+stmt_list: stm*
+
+stm: id "=" exp ";"
+    | "output" exp ";"
+    | "if" "(" exp ")" "{" stmt_list "}" [ "else" "{" stmt_list "}" ]
+    | "while" "(" exp ")" "{" stmt_list "}"
+    | "var" id ";"
+    | "*" exp "=" exp ";"
+    | id "." id "=" exp ";"
+    | "(" "*" exp ")" "." id "=" exp ";"
+
+// =======================
+// Expressions
+// =======================
+int: INT
+
+id: VAR
+
+?exp: cmp
+
+cmp: arith
+    | arith ">" arith
+    | arith "==" arith
+
+arith: arith "+" term
+    | arith "-" term
+    | term
+
+term: term "*" factor
+    | term "/" factor
+    | factor
+
+factor: primary ( "(" exp ("," exp)* ")" | "." id )*
+// Id (Exp, ..., Exp)
+// Exp (Exp, ..., Exp)
+// Exp.Id
+
+primary: int
+    | id
+    | "(" exp ")"
+    | "input"
+    | "alloc" exp
+    | "&" id
+    | "*" exp
+    | "null"
+    | "{" id ":" exp ("," id ":" exp)* "}"
+
+// =======================
+// Tokens
+// =======================
+VAR: /[a-zA-Z_][a-zA-Z0-9_]*/
+
+%import common.INT
+%import common.WS
+%ignore WS
