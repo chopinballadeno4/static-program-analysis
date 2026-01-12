@@ -1,0 +1,7 @@
+arith(a, b) {
+    a = a + b;
+    a = a - 1;
+    a = a * 2;
+    a = a / 2;
+    return a;
+}

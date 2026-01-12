@@ -1,0 +1,5 @@
+use_null() {
+    var x;
+    x = null;
+    return x;
+}

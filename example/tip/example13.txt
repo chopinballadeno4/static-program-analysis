@@ -1,0 +1,5 @@
+alloc_test(x) {
+    var p;
+    p = alloc x;
+    return *p;
+}

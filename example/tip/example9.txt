@@ -1,0 +1,4 @@
+call(x) {
+    x = 1;
+    return f(x, x);
+}

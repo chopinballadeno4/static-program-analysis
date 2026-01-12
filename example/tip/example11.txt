@@ -1,0 +1,5 @@
+read() {
+    var x;
+    x = input;
+    return x;
+}

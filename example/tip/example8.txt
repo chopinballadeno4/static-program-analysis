@@ -1,0 +1,4 @@
+print(x) {
+    output x;
+    return x;
+}

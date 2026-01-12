@@ -1,0 +1,4 @@
+nested(f, x) {
+    x = 3;
+    return f(x).a;
+}

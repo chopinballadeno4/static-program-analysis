@@ -1,0 +1,9 @@
+cmp(n, m) {
+    if (n > m) {
+        return 1;
+    }
+    if (n == m) {
+        return 0;
+    }
+    return -1;
+}

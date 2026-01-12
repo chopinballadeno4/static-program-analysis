@@ -1,0 +1,4 @@
+set_field(r) {
+    r.a = 10;
+    return r.a;
+}

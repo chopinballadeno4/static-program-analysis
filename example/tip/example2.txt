@@ -1,0 +1,4 @@
+decl() {
+    var x;
+    return x;
+}

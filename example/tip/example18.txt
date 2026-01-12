@@ -1,0 +1,4 @@
+set_field_ptr(p) {
+    (*p).a = 1;
+    return (*p).a;
+}

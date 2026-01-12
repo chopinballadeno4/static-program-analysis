@@ -1,0 +1,81 @@
+// =======================
+// Program
+// =======================
+?prog: func*
+
+// =======================
+// Functions
+// =======================
+func: id "(" ids ")" "{" stmts stmt_return "}"
+
+?ids: [ id ("," id)* ]
+
+// =======================
+// Statements
+// =======================
+?stmts: stmt+
+
+?stmt: id "=" expr ";" -> stmt_assign
+    | "output" expr ";" -> stmt_output
+    | "if" "(" expr ")" "{" stmts "}" [ "else" "{" stmts "}" ] -> stmt_if
+    | "while" "(" expr ")" "{" stmts "}" -> stmt_while
+    | "var" id ";" -> stmt_decl
+    | "*" expr "=" expr ";" -> stmt_deref_assign
+    | id "." id "=" expr ";" -> stmt_field_assign
+    | "(" "*" expr ")" "." id "=" expr ";" -> stmt_deref_field_assign
+    | stmt_return
+
+stmt_return: "return" expr ";"
+
+// =======================
+// Expressions
+// =======================
+?expr: cmp
+
+?cmp: arith ">" arith -> cmp_gt
+    | arith "==" arith -> cmp_eq
+    | arith
+
+?arith: arith "+" term -> arith_add
+    | arith "-" term -> arith_sub
+    | term
+
+?term: term "*" factor -> term_mul
+    | term "/" factor -> term_div
+    | factor
+
+?exprs: [ expr ("," expr)* ]
+
+?factor: factor "(" exprs ")" -> factor_call
+       | factor "." id -> factor_field
+       | prim
+
+?prim: INPUT -> prim_input
+    | NULL -> prim_null
+    | int
+    | id
+    | "(" expr ")" -> prim_paren
+    | "alloc" expr -> prim_alloc
+    | "&" id -> prim_ref
+    | "*" expr -> prim_deref
+    | "null" -> prim_null
+    | "{" field ("," field)* "}" -> prim_struct
+
+?field: id ":" expr
+
+// =======================
+// Expressions
+// =======================
+int: INT
+id: VAR
+
+// =======================
+// Tokens
+// =======================
+INPUT: "input"
+NULL: "null"
+VAR: /[a-zA-Z_][a-zA-Z0-9_]*/
+INT: /-?[0-9]+/
+
+%import common.WS
+%ignore WS

@@ -1,0 +1,5 @@
+make_struct(x, y) {
+    x = 1;
+    y = 2;
+    return { a: x, b: 1 };
+}
