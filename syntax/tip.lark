@@ -1,7 +1,7 @@
 // =======================
 // Program
 // =======================
-?prog: func*
+prog: func*
 
 // =======================
 // Functions
@@ -19,7 +19,7 @@ func: id "(" ids ")" "{" stmts stmt_return "}"
     | "output" expr ";" -> stmt_output
     | "if" "(" expr ")" "{" stmts "}" [ "else" "{" stmts "}" ] -> stmt_if
     | "while" "(" expr ")" "{" stmts "}" -> stmt_while
-    | "var" id ";" -> stmt_decl
+    | "var" id ("," id)* ";" -> stmt_decl
     | "*" expr "=" expr ";" -> stmt_deref_assign
     | id "." id "=" expr ";" -> stmt_field_assign
     | "(" "*" expr ")" "." id "=" expr ";" -> stmt_deref_field_assign

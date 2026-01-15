@@ -1,0 +1,26 @@
+main(a) {
+    var x;
+
+    if(x == 3) {
+        x = 4;
+    }
+
+    if(x > 4) {
+        x = 5;
+    }
+
+    return x;
+}
+
+"""
+[main] = ([a]) -> [x]
+[x] = [3]
+[3] = int
+[x == 3] = int
+[x] = [4]
+[4] = int
+[x > 4] = int
+[x] = [5]
+[5] = int
+[x] = int
+[a] = int

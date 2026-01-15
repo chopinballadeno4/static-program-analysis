@@ -1,0 +1,9 @@
+foo(n, k) {
+    n = input;
+    return n;
+}
+
+"""
+[foo] = ([n], [k]) -> [n]
+[input] = int
+[n] = [input]

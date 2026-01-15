@@ -1,0 +1,44 @@
+foo(p,x) {
+    var f,q;
+    if (*p==0) { f=1; }
+    else {
+        q = alloc 0;
+        *q = (*p)-1;
+        f=(*p)*(x(q,x));
+    }
+
+    return f;
+}
+
+main() {
+    var n;
+    n = input;
+
+    return foo(&n,foo);
+}
+
+"""
+[foo] = ([p], [x]) -> [f] # O
+[*p == 0] = int # O
+[*p] = int # O
+[f] = [1] # O
+[1] = int # O
+[0] = int # O
+[p] = ↑[*p]
+[q] = [alloc 0] # O
+[alloc 0] = ↑[0] # O
+[q] = ↑[(*p) - 1] # O
+[q] = ↑[*q]
+[*p] = int
+[f] = [(*p) * (x(q, x))] # O
+[(*p) * (x(q, x))] = int
+[x(q, x)] = int
+[x] = ([q], [x]) -> [x(q, x)]
+[input] = int # O
+[main] = () -> [foo(&n, foo)] # O
+[n] = [input] # O
+[&n] = ↑[n]
+[foo] = ([&n], [foo]) -> [foo(&n, foo)]
+[*p] = [0]
+[(*p) - 1] = int
+[foo(&n, foo)] = int

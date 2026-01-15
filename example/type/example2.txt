@@ -1,0 +1,18 @@
+short() {
+    var x, y, z;
+    x = input;
+    y = alloc x;
+    *y = x;
+    z = *y;
+    return z;
+}
+
+"""
+[short] = () -> [z]
+[input] = int
+[x] = [input]
+[alloc x] = ↑[x]
+[y] = [alloc x]
+[y] = ↑[x]
+[z] = [*y]
+[y] = ↑[*y]
