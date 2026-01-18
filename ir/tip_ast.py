@@ -358,8 +358,23 @@ class VariableCollector(ASTVisitor):
 
     def visit_Function(self, node: Function):
         # X(X1, ..., Xn) { ...return E; }: [X] = ([X1], ..., [Xn]) -> [E]
-        # main(X1, ..., Xn) { ...return E; }: [X1] = ... [Xn] = [E] = int
         print('----- visit_Function')
+
+        if node.name.name == 'main':
+            # main(X1, ..., Xn) { ...return E; }: [X1] = ... [Xn] = [E] = int
+            params = node.parameters
+            params = params if isinstance(params, list) else [params]
+
+            self.typeConstraints.extend(
+                TypeEqualityConstraint(Type(param), IntType)
+                for param in params
+            )
+            self.typeConstraints.append(
+                TypeEqualityConstraint(
+                    Type(removeParenthesize(node.return_statement.expression)),
+                    IntType
+                )
+            )
 
         # Function type constraint 추가
         params = node.parameters if isinstance(node.parameters, list) else [node.parameters]
