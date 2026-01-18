@@ -18,25 +18,25 @@ main() {
 }
 
 """
-[foo] = ([p], [x]) -> [f] # O
-[*p == 0] = int # O
-[*p] = int # O
-[f] = [1] # O
-[1] = int # O
-[0] = int # O
+[foo] = ([p], [x]) -> [f]
+[*p == 0] = int
+[*p] = int
+[f] = [1]
+[1] = int
+[0] = int
 [p] = ↑[*p]
-[q] = [alloc 0] # O
-[alloc 0] = ↑[0] # O
-[q] = ↑[(*p) - 1] # O
+[q] = [alloc 0]
+[alloc 0] = ↑[0]
+[q] = ↑[(*p) - 1]
 [q] = ↑[*q]
 [*p] = int
-[f] = [(*p) * (x(q, x))] # O
+[f] = [(*p) * (x(q, x))]
 [(*p) * (x(q, x))] = int
 [x(q, x)] = int
 [x] = ([q], [x]) -> [x(q, x)]
-[input] = int # O
-[main] = () -> [foo(&n, foo)] # O
-[n] = [input] # O
+[input] = int
+[main] = () -> [foo(&n, foo)]
+[n] = [input]
 [&n] = ↑[n]
 [foo] = ([&n], [foo]) -> [foo(&n, foo)]
 [*p] = [0]

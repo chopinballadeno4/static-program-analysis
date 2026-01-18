@@ -33,10 +33,16 @@ class Id(_Expression):
     # x, y, z, ...
     name: str
 
+    def __str__(self):
+        return self.name
+
 @dataclass
 class Int(_Expression):
     # 0, 1, -1, ...
     value: int
+
+    def __str__(self):
+        return str(self.value)
 
 @dataclass
 class Field(_Ast):
@@ -56,9 +62,17 @@ class Assignment(_Statement):
     expression: _Expression
 
 @dataclass
+class Dereference(_Expression):
+    # * Exp
+    expression: _Expression
+
+    def __str__(self):
+        return f"*{self.expression}"
+
+@dataclass
 class DereferenceAssignment(_Statement):
     # *Exp = Exp;
-    target: _Expression
+    target: Dereference
     expression: _Expression
 
 @dataclass
@@ -86,12 +100,28 @@ class Arithmetic(_Expression):
     operator: ArithmeticOperator
     right_expression: _Expression
 
+    def __str__(self):
+        op_map = {
+            ArithmeticOperator.ADD: '+',
+            ArithmeticOperator.SUB: '-',
+            ArithmeticOperator.MUL: '*',
+            ArithmeticOperator.DIV: '/'
+        }
+        return f"{self.left_expression} {op_map[self.operator]} {self.right_expression}"
+
 @dataclass
 class Comparison(_Expression):
     # Exp == Exp
     left_expression: _Expression
     operator: ComparisonOperator
     right_expression: _Expression
+
+    def __str__(self):
+        op_map = {
+            ComparisonOperator.EQ: '==',
+            ComparisonOperator.GT: '>'
+        }
+        return f"{self.left_expression} {op_map[self.operator]} {self.right_expression}"
 
 @dataclass
 class If(_Statement):
@@ -117,35 +147,47 @@ class FunctionCall(_Expression):
     callee: _Expression
     expressions: List[_Expression]
 
+    def __str__(self):
+        args = ', '.join(str(e) for e in self.expressions)
+        return f"{self.callee}({args})"
+
 @dataclass
 class Parenthesize(_Expression):
     # ( Exp )
     expression: _Expression
 
+    def __str__(self):
+        return f"({self.expression})"
+
 @dataclass
 class Input(_Expression):
     # input
-    pass
+
+    def __str__(self):
+        return "input"
 
 @dataclass
 class Null(_Expression):
     # null
-    pass
+
+    def __str__(self):
+        return "null"
 
 @dataclass
 class Reference(_Expression):
-    # * Exp
+    # & Id
     id: Id
 
-@dataclass
-class Dereference(_Expression):
-    # & Id
-    expression: _Expression
+    def __str__(self):
+        return f"&{self.id}"
 
 @dataclass
 class Allocation(_Expression):
     # alloc Exp
     expression: _Expression
+
+    def __str__(self):
+        return f"alloc {self.expression}"
 
 @dataclass
 class Struct(_Expression):
@@ -168,7 +210,7 @@ class FieldAssignment(_Statement):
 @dataclass
 class DereferenceFieldAssignment(_Statement):
     # ( * Exp ) . Id = Exp;
-    target: _Expression
+    target: Dereference
     key: Id
     expression: _Expression
 
@@ -276,21 +318,35 @@ Type -> int
 	| µ TypeVar.Type
 	| TypeVar
 """
-class IntType:
-    pass
-
 @dataclass
 class Type:
     value: _Expression
+
+    def __str__(self):
+        return f"[{self.value}]"
+
+class IntType:
+    def __str__(self):
+        return "int"
+
+    def __eq__(self, other):
+        return isinstance(other, IntType)
 
 @dataclass
 class PointerType:
     base: Type
 
+    def __str__(self):
+        return f"↑[{self.base}]"
+
 @dataclass
 class FunctionType:
     params: list[Type]
     result: Type
+
+    def __str__(self):
+        params_str = ', '.join(str(p) for p in self.params)
+        return f"({params_str}) -> {self.result}"
 
 @dataclass
 class TypeVar:
@@ -305,6 +361,9 @@ class RecursiveType:
 class TypeEqualityConstraint:
     left: Type
     right: Type
+
+    def __str__(self):
+        return f"  - {self.left} = {self.right}"
 
 
 def removeParenthesize(expression):
@@ -341,21 +400,21 @@ class ASTVisitor:
 # 사용 예제: 모든 변수 이름 수집
 @dataclass
 class VariableCollector(ASTVisitor):
-    typeConstraints: list[TypeEqualityConstraint] = field(default_factory=list)
+    constraints: list[TypeEqualityConstraint] = field(default_factory=list)
 
     @property
     def uniqueConstraints(self) -> list[TypeEqualityConstraint]:
         result = []
-        for c in self.typeConstraints:
+        for c in self.constraints:
             if c not in result:
                 result.append(c)
         return result
 
     def __str__(self):
         lines = []
-        lines.append(f"TypeConstraints({len(self.uniqueConstraints)}):")
+        lines.append(f"constraints({len(self.uniqueConstraints)}):")
         for c in self.uniqueConstraints:
-            lines.append(f"  - left: {c.left} , right: {c.right}")
+            lines.append(str(c))
         return "\n".join(lines)
 
     def visit_list(self, node: list):
@@ -377,24 +436,27 @@ class VariableCollector(ASTVisitor):
         # X(X1, ..., Xn) { ...return E; }: [X] = ([X1], ..., [Xn]) -> [E]
         print('----- visit_Function')
 
+        params = []
+        if node.parameters is not None:
+            if isinstance(node.parameters, list):
+                params = node.parameters
+            else:
+                params = [node.parameters]
+
         if node.name.name == 'main':
             # main(X1, ..., Xn) { ...return E; }: [X1] = ... [Xn] = [E] = int
-            params = node.parameters
-            params = params if isinstance(params, list) else [params]
-
-            self.typeConstraints.extend(
-                TypeEqualityConstraint(Type(param), IntType)
+            self.constraints.extend(
+                TypeEqualityConstraint(Type(param), IntType())
                 for param in params
             )
-            self.typeConstraints.append(
+            self.constraints.append(
                 TypeEqualityConstraint(
                     Type(removeParenthesize(node.return_statement.expression)),
-                    IntType
+                    IntType()
                 )
             )
 
         # Function type constraint 추가
-        params = node.parameters if isinstance(node.parameters, list) else [node.parameters]
         temp = [Type(p) for p in params]
 
         self.visit(node.return_statement.expression)
@@ -406,7 +468,7 @@ class VariableCollector(ASTVisitor):
                 Type(node.return_statement.expression)
             )
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
         self.visit(node.statements)
 
@@ -419,7 +481,7 @@ class VariableCollector(ASTVisitor):
             Type(node),
             PointerType(node.id)
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
     def visit_Dereference(self, node: Dereference):
         # *E: [E] = ↑[*E]
@@ -432,7 +494,7 @@ class VariableCollector(ASTVisitor):
             Type(node.expression),
             PointerType(node)
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
     def visit_Parenthesize(self, node: Parenthesize):
         print('----- visit_Parenthesize')
@@ -454,7 +516,7 @@ class VariableCollector(ASTVisitor):
                 Type(node)
             )
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
     def visit_Allocation(self, node: Allocation):
         # alloc E: [alloc E] = ↑[E]
@@ -467,7 +529,7 @@ class VariableCollector(ASTVisitor):
             Type(node),
             PointerType(node.expression)
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
     def visit_Int(self, node: Int):
         # I: [I] = int
@@ -476,9 +538,9 @@ class VariableCollector(ASTVisitor):
         # Int type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node),
-            IntType
+            IntType()
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
     def visit_Id(self, node: Id):
         print('----- visit_Id')
@@ -491,9 +553,9 @@ class VariableCollector(ASTVisitor):
         # Input type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node),
-            IntType
+            IntType()
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
     def visit_Assignment(self, node: Assignment):
         # X = E: [X] = [E]
@@ -506,7 +568,7 @@ class VariableCollector(ASTVisitor):
             Type(node.id),
             Type(node.expression)
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
     def visit_Declaration(self, node: Declaration):
         print('----- visit_Declaration')
@@ -521,10 +583,10 @@ class VariableCollector(ASTVisitor):
 
         # DereferenceAssignment type constraint 추가
         constraint1 = TypeEqualityConstraint(
-            Type(node.target),
+            Type(node.target.expression),
             PointerType(node.expression)
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
     def visit_If(self, node: If):
         # if(E) S: [E] = int
@@ -536,9 +598,9 @@ class VariableCollector(ASTVisitor):
 
         constraint1 = TypeEqualityConstraint(
             Type(node.condition),
-            IntType
+            IntType()
         )
-        self.typeConstraints.append(constraint1)
+        self.constraints.append(constraint1)
 
         self.visit(node.true_statement)
         if node.false_statement != None:
@@ -557,9 +619,9 @@ class VariableCollector(ASTVisitor):
         )
         constraint2 = TypeEqualityConstraint(
             Type(node),
-            IntType
+            IntType()
         )
-        self.typeConstraints += [constraint1, constraint2]
+        self.constraints += [constraint1, constraint2]
 
     def visit_Arithmetic(self, node: Arithmetic):
         print('----- visit_Arithmetic')
@@ -570,15 +632,15 @@ class VariableCollector(ASTVisitor):
 
         constraint1 = TypeEqualityConstraint(
             Type(node),
-            IntType
+            IntType()
         )
         # E1 op E2: [E1] = [E2] = [E1 or E2] = int
         constraint2 = TypeEqualityConstraint(
             Type(removeParenthesize(node.left_expression)),
-            IntType
+            IntType()
         )
         constraint3 = TypeEqualityConstraint(
             Type(removeParenthesize(node.right_expression)),
-            IntType
+            IntType()
         )
-        self.typeConstraints += [constraint1, constraint2, constraint3]
+        self.constraints += [constraint1, constraint2, constraint3]
