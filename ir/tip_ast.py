@@ -306,18 +306,6 @@ class TypeEqualityConstraint:
     left: Type
     right: Type
 
-@dataclass
-class FunctionTypeConstraint:
-    #typeVariable: list = field(default_factory=list)
-    typeConstraint: list = field(default_factory=list)
-
-    def __str__(self):
-        if not self.typeConstraint:
-            return "FunctionTypeConstraint:\n  (empty)"
-        return "FunctionTypeConstraint:\n" + "\n".join(
-            f"  - {item}" for item in self.typeConstraint
-        )
-
 
 def removeParenthesize(expression):
     """
@@ -353,8 +341,7 @@ class ASTVisitor:
 # 사용 예제: 모든 변수 이름 수집
 @dataclass
 class VariableCollector(ASTVisitor):
-    functionDict = {}
-    functionName = ""
+    typeConstraints: list[TypeEqualityConstraint] = field(default_factory=list)
 
     def visit_list(self, node: list):
         print('----- visit_list')
@@ -374,14 +361,6 @@ class VariableCollector(ASTVisitor):
         # main(X1, ..., Xn) { ...return E; }: [X1] = ... [Xn] = [E] = int
         print('----- visit_Function')
 
-        # function 추가
-        functionName = node.name.name
-        self.functionName = functionName
-        self.functionDict[self.functionName] = FunctionTypeConstraint()
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
-
         # Function type constraint 추가
         params = node.parameters if isinstance(node.parameters, list) else [node.parameters]
         temp = [Type(p) for p in params]
@@ -395,32 +374,24 @@ class VariableCollector(ASTVisitor):
                 Type(node.return_statement.expression)
             )
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
         self.visit(node.statements)
-
-        print(function)
 
     def visit_Reference(self, node: Reference):
         # &X: [&X] = ↑[X]
         print('----- visit_Reference')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         # Reference type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node),
             PointerType(node.id)
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
     def visit_Dereference(self, node: Dereference):
         # *E: [E] = ↑[*E]
         print('----- visit_Dereference')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         self.visit(node.expression)
 
@@ -429,7 +400,7 @@ class VariableCollector(ASTVisitor):
             Type(node.expression),
             PointerType(node)
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
     def visit_Parenthesize(self, node: Parenthesize):
         print('----- visit_Parenthesize')
@@ -439,9 +410,6 @@ class VariableCollector(ASTVisitor):
     def visit_FunctionCall(self, node: FunctionCall):
         # E(E1, ..., En): [E] = ([E1], ..., [En]) -> [E(E1, ..., En)]
         print('----- visit_FunctionCall')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         # If type constraint 추가
         self.visit(node.callee)
@@ -454,14 +422,11 @@ class VariableCollector(ASTVisitor):
                 Type(node)
             )
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
     def visit_Allocation(self, node: Allocation):
         # alloc E: [alloc E] = ↑[E]
         print('----- visit_Allocation')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         self.visit(node.expression)
 
@@ -470,21 +435,18 @@ class VariableCollector(ASTVisitor):
             Type(node),
             PointerType(node.expression)
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
     def visit_Int(self, node: Int):
         # I: [I] = int
         print('----- visit_Int')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         # Int type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node),
             IntType
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
     def visit_Id(self, node: Id):
         print('----- visit_Id')
@@ -494,22 +456,16 @@ class VariableCollector(ASTVisitor):
         # input: [input] = int
         print('----- visit_Input')
 
-        # function 가져오기
-        function = self.functionDict[self.functionName]
-
         # Input type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node),
             IntType
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
     def visit_Assignment(self, node: Assignment):
         # X = E: [X] = [E]
         print('----- visit_Assignment')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         # Assignment type constraint 추가
         self.visit(node.expression)
@@ -518,7 +474,7 @@ class VariableCollector(ASTVisitor):
             Type(node.id),
             Type(node.expression)
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
     def visit_Declaration(self, node: Declaration):
         print('----- visit_Declaration')
@@ -528,9 +484,6 @@ class VariableCollector(ASTVisitor):
         # *E1 = E2: [E1] = ↑[E2]
         print('----- visit_DereferenceAssignment')
 
-        # function 가져오기
-        function = self.functionDict[self.functionName]
-
         self.visit(node.target)
         self.visit(node.expression)
 
@@ -539,15 +492,12 @@ class VariableCollector(ASTVisitor):
             Type(node.target),
             PointerType(node.expression)
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
     def visit_If(self, node: If):
         # if(E) S: [E] = int
         # if(E) S1 else S2: [E] = int
         print('----- visit_If')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         # If type constraint 추가
         self.visit(node.condition)
@@ -556,7 +506,7 @@ class VariableCollector(ASTVisitor):
             Type(node.condition),
             IntType
         )
-        function.typeConstraint.append(constraint1)
+        self.typeConstraints.append(constraint1)
 
         self.visit(node.true_statement)
         if node.false_statement != None:
@@ -564,9 +514,6 @@ class VariableCollector(ASTVisitor):
 
     def visit_Comparison(self, node: Comparison):
         print('----- visit_Comparison')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         # Comparison type constraint 추가
         self.visit(node.left_expression)
@@ -580,13 +527,10 @@ class VariableCollector(ASTVisitor):
             Type(node),
             IntType
         )
-        function.typeConstraint += [constraint1, constraint2]
+        self.typeConstraints += [constraint1, constraint2]
 
     def visit_Arithmetic(self, node: Arithmetic):
         print('----- visit_Arithmetic')
-
-        # function 가져오기
-        function = self.functionDict[self.functionName]
 
         # Arithmetic type constraint 추가
         self.visit(node.left_expression)
@@ -605,4 +549,4 @@ class VariableCollector(ASTVisitor):
             Type(removeParenthesize(node.right_expression)),
             IntType
         )
-        function.typeConstraint += [constraint1, constraint2, constraint3]
+        self.typeConstraints += [constraint1, constraint2, constraint3]
