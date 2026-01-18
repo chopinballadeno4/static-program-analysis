@@ -343,6 +343,21 @@ class ASTVisitor:
 class VariableCollector(ASTVisitor):
     typeConstraints: list[TypeEqualityConstraint] = field(default_factory=list)
 
+    @property
+    def uniqueConstraints(self) -> list[TypeEqualityConstraint]:
+        result = []
+        for c in self.typeConstraints:
+            if c not in result:
+                result.append(c)
+        return result
+
+    def __str__(self):
+        lines = []
+        lines.append(f"TypeConstraints({len(self.uniqueConstraints)}):")
+        for c in self.uniqueConstraints:
+            lines.append(f"  - left: {c.left} , right: {c.right}")
+        return "\n".join(lines)
+
     def visit_list(self, node: list):
         print('----- visit_list')
 
@@ -355,6 +370,8 @@ class VariableCollector(ASTVisitor):
         for func in node.functions:
             # function 단위로 타입 검사를 하기 때문에 여기서 전부 올바른지 확인해야 함
             self.visit(func)
+
+        print(self)
 
     def visit_Function(self, node: Function):
         # X(X1, ..., Xn) { ...return E; }: [X] = ([X1], ..., [Xn]) -> [E]
