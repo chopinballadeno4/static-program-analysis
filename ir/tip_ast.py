@@ -319,8 +319,18 @@ class FunctionTypeConstraint:
         )
 
 
-    return result
-"""
+def removeParenthesize(expression):
+    """
+    remove parenthesize and get pure expression
+    + spa p23 - "parenthesized expression are not present in the abstract syntax"
+    :param expression: (( Exp ))
+    :return: Exp
+    """
+    if isinstance(expression, Parenthesize):
+        return removeParenthesize(expression.expression)
+    else:
+        return expression
+
 
 @dataclass
 class ASTVisitor:
@@ -586,12 +596,13 @@ class VariableCollector(ASTVisitor):
             Type(node),
             IntType
         )
+        # E1 op E2: [E1] = [E2] = [E1 or E2] = int
         constraint2 = TypeEqualityConstraint(
-            Type(node.left_expression),
+            Type(removeParenthesize(node.left_expression)),
             IntType
         )
         constraint3 = TypeEqualityConstraint(
-            Type(node.right_expression),
+            Type(removeParenthesize(node.right_expression)),
             IntType
         )
         function.typeConstraint += [constraint1, constraint2, constraint3]
