@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -12,29 +13,51 @@ Type -> int
 	| µ TypeVar.Type
 	| TypeVar
 """
+class _Type:
+    pass
+
 @dataclass
-class Type:
+class Type(_Type):
     value: _Expression
 
     def __str__(self):
         return f"[{self.value}]"
 
-class IntType:
+    def __eq__(self, other):
+        if not isinstance(other, Type):
+            return False
+        return self.value == other.value
+
+    def __hash__(self):
+        return hash(self.value)
+
+class IntType(_Type):
     def __str__(self):
         return "int"
 
     def __eq__(self, other):
         return isinstance(other, IntType)
 
+    def __hash__(self):
+        return hash("int")
+
 @dataclass
-class PointerType:
+class PointerType(_Type):
     base: Type
 
     def __str__(self):
         return f"↑[{self.base}]"
 
+    def __eq__(self, other):
+        if not isinstance(other, PointerType):
+            return False
+        return self.base == other.base
+
+    def __hash__(self):
+        return hash(self.base)
+
 @dataclass
-class FunctionType:
+class FunctionType(_Type):
     params: list[Type]
     result: Type
 
@@ -42,14 +65,38 @@ class FunctionType:
         params_str = ', '.join(str(p) for p in self.params)
         return f"({params_str}) -> {self.result}"
 
-@dataclass
-class TypeVar:
-    name: str
+    def __eq__(self, other):
+        if not isinstance(other, FunctionType):
+            return False
+        return self.params == other.params and self.result == other.result
+
+    def __hash__(self):
+        return hash((tuple(self.params), self.result))
 
 @dataclass
-class RecursiveType:
+class TypeVar(_Type):
+    name: str
+
+    def __eq__(self, other):
+        if not isinstance(other, TypeVar):
+            return False
+        return self.name == other.name
+
+    def __hash__(self):
+        return hash(self.name)
+
+@dataclass
+class RecursiveType(_Type):
     var: TypeVar
     body: Type
+
+    def __eq__(self, other):
+        if not isinstance(other, RecursiveType):
+            return False
+        return self.var == other.var and self.body == other.body
+
+    def __hash__(self):
+        return hash((self.var, self.body))
 
 @dataclass
 class TypeEqualityConstraint:
@@ -75,41 +122,56 @@ def removeParenthesize(expression):
 
 @dataclass
 class ASTVisitor:
-    method_name: str
-
     def visit(self, node: _Ast) -> Any:
         """노드 타입에 따라 적절한 visit 메서드 호출"""
         # 예: Function 노드 -> 'visit_Function' 찾기
-        self.method_name = f'visit_{node.__class__.__name__}'
+        method_name = f'visit_{node.__class__.__name__}'
 
         # 해당 메서드가 있으면 그것을, 없으면 generic_visit 사용
-        visitor = getattr(self, self.method_name, self.generic_visit)
+        visitor = getattr(self, method_name, lambda n: self.generic_visit(method_name))
 
         return visitor(node)
 
-    def generic_visit(self, node: _Ast) -> Any:
-        print('no node: ' + self.method_name)
+    def generic_visit(self, method_name: str) -> Any:
+        print('no node: ' + method_name)
 
 
 # 사용 예제: 모든 변수 이름 수집
 @dataclass
-class VariableCollector(ASTVisitor):
+class ConstraintCollector(ASTVisitor):
     constraints: list[TypeEqualityConstraint] = field(default_factory=list)
+    unique_constraints: list[TypeEqualityConstraint] = field(default_factory=list)
+    #unique_constraint_elements: list[Type] = field(default_factory=list)
 
-    @property
-    def uniqueConstraints(self) -> list[TypeEqualityConstraint]:
-        result = []
+    def print_constraints(self):
+        # 수집한 constraints
+        print('[constraints]')
         for c in self.constraints:
-            if c not in result:
-                result.append(c)
-        return result
+            print(f" - {str(c)}")
 
-    def __str__(self):
-        lines = []
-        lines.append(f"constraints({len(self.uniqueConstraints)}):")
-        for c in self.uniqueConstraints:
-            lines.append(str(c))
-        return "\n".join(lines)
+        # 중복 없는 constraints
+        print('\n[unique_constraints]')
+        for c in self.unique_constraints:
+            print(f" - {str(c)}")
+
+        # 중복 없는 type variable
+        # print('\n[unique_constraint_elements]')
+        # for c in self.unique_constraint_elements:
+        #     print(f" - {str(c)}")
+
+    def set_unique_constraints(self):
+        if len(self.constraints) > 0:
+            self.unique_constraints = []
+            for c in self.constraints:
+                if c not in self.unique_constraints:
+                    self.unique_constraints.append(c)
+
+            # self.unique_constraint_elements = []
+            # for c in self.unique_constraints:
+            #     if c.left not in self.unique_constraint_elements:
+            #         self.unique_constraint_elements.append(c.left)
+            #     if c.right not in self.unique_constraint_elements:
+            #         self.unique_constraint_elements.append(c.right)
 
     def visit_list(self, node: list):
         for item in node:
@@ -163,7 +225,7 @@ class VariableCollector(ASTVisitor):
         # Reference type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node),
-            PointerType(node.id)
+            PointerType(Type(node.id))
         )
         self.constraints.append(constraint1)
 
@@ -174,7 +236,7 @@ class VariableCollector(ASTVisitor):
         # Dereference type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node.expression),
-            PointerType(node)
+            PointerType(Type(node))
         )
         self.constraints.append(constraint1)
 
@@ -203,7 +265,7 @@ class VariableCollector(ASTVisitor):
         # Allocation type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node),
-            PointerType(node.expression)
+            PointerType(Type(node.expression))
         )
         self.constraints.append(constraint1)
 
@@ -250,7 +312,7 @@ class VariableCollector(ASTVisitor):
         # DereferenceAssignment type constraint 추가
         constraint1 = TypeEqualityConstraint(
             Type(node.target.expression),
-            PointerType(node.expression)
+            PointerType(Type(node.expression))
         )
         self.constraints.append(constraint1)
 
