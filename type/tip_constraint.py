@@ -12,6 +12,8 @@ Type -> int
 	| (Type, …, Type) -> Type
 	| µ TypeVar.Type
 	| TypeVar
+	| {Id: Type, ... Id: Type}
+	| absence
 """
 class _Type:
     pass
@@ -46,7 +48,7 @@ class PointerType(_Type):
     base: Type
 
     def __str__(self):
-        return f"↑[{self.base}]"
+        return f"↑{self.base}"
 
     def __eq__(self, other):
         if not isinstance(other, PointerType):
@@ -75,15 +77,14 @@ class FunctionType(_Type):
 
 @dataclass
 class TypeVar(_Type):
-    name: str
+    def __str__(self):
+        return "typevar"
 
     def __eq__(self, other):
-        if not isinstance(other, TypeVar):
-            return False
-        return self.name == other.name
+        return isinstance(other, TypeVar)
 
     def __hash__(self):
-        return hash(self.name)
+        return hash("typevar")
 
 @dataclass
 class RecursiveType(_Type):
@@ -97,6 +98,33 @@ class RecursiveType(_Type):
 
     def __hash__(self):
         return hash((self.var, self.body))
+
+@dataclass
+class StructType(_Type):
+    field_map: dict
+
+    def __eq__(self, other):
+        if not isinstance(other, StructType):
+            return False
+        return self.field_map == other.field_map
+
+    def __hash__(self):
+        return hash(tuple(sorted(self.field_map.items(), key=lambda x: str(x[0]))))
+
+    def __str__(self):
+        items = ', '.join(f"{k}: {v}" for k, v in self.field_map.items())
+        return f"{{{items}}}"
+
+@dataclass
+class AbsenceType(_Type):
+    def __str__(self):
+        return '*'
+
+    def __eq__(self, other):
+        return isinstance(other, AbsenceType)
+
+    def __hash__(self):
+        return hash("absence")
 
 @dataclass
 class TypeEqualityConstraint:
@@ -139,6 +167,9 @@ class ASTVisitor:
 # 사용 예제: 모든 변수 이름 수집
 @dataclass
 class ConstraintCollector(ASTVisitor):
+    record_constraints: list[tuple[str, TypeEqualityConstraint]] = field(default_factory=list)
+    record_fields: set[Id] = field(default_factory=set)
+
     constraints: list[TypeEqualityConstraint] = field(default_factory=list)
     unique_constraints: list[TypeEqualityConstraint] = field(default_factory=list)
     #unique_constraint_elements: list[Type] = field(default_factory=list)
@@ -172,6 +203,27 @@ class ConstraintCollector(ASTVisitor):
             #         self.unique_constraint_elements.append(c.left)
             #     if c.right not in self.unique_constraint_elements:
             #         self.unique_constraint_elements.append(c.right)
+
+    def set_record_field(self):
+        for element in self.record_constraints:
+            type = element[0]
+            value = element[1]
+            if type == 'field_access':
+                # [E] = { ..., X: [E.X] ,... } , 없는 field 는 TypeVar 로 추가
+                for f in self.record_fields:
+                    if f not in value.right.field_map:
+                        value.right.field_map[f] = TypeVar()
+
+            elif type == 'struct':
+                # [{ X1:E1, ... Xn:En }] = { X1:[E1], ... Xn:[En] } , 없는 field 는 absence 로 추가
+                for f in self.record_fields:
+                    if f not in value.right.field_map:
+                        value.right.field_map[f] = AbsenceType()
+            else:
+                print('[ERROR]')
+
+            # 원본 제약 배열에 넣어주기
+            self.constraints.append(value)
 
     def visit_list(self, node: list):
         for item in node:
@@ -244,6 +296,18 @@ class ConstraintCollector(ASTVisitor):
         self.visit(node.expression)
 
     def visit_FunctionCall(self, node: FunctionCall):
+        """
+        [q] = ↑ int
+        [x(q, x)] = int
+        [x] = ([q], [x]) -> [x(q, x)]
+        => [x] = µt.(↑ int, t) -> int
+
+        g = (x) -> foo
+        foo(1, g(x))
+
+        recursive 발생 조건
+        - callee 가 인자로 다시 들어가는 경우
+        """
         # E(E1, ..., En): [E] = ([E1], ..., [En]) -> [E(E1, ..., En)]
         # If type constraint 추가
         self.visit(node.callee)
@@ -366,3 +430,38 @@ class ConstraintCollector(ASTVisitor):
             IntType()
         )
         self.constraints += [constraint1, constraint2, constraint3]
+
+    def visit_Struct(self, node: Struct):
+        # { X1:E1, ... Xn:En }: [{ X1:E1, ... Xn:En }] = { X1:[E1], ... Xn:[En] }
+        field_map = dict()
+
+        for f in node.fields:
+            # field 목록 수집
+            self.record_fields.add(f.key)
+
+            if f.key not in field_map:
+                self.visit(f.Value)
+                field_map[f.key] = Type(f.Value)
+
+        constraint1 = TypeEqualityConstraint(
+            Type(node),
+            StructType(field_map)
+        )
+        #self.constraints.append(constraint1)
+        # record 에 absence 와 TypeVar 을 넣어주기 위해 지연
+        self.record_constraints.append(("struct", constraint1))
+
+    def visit_FieldAccess(self, node: FieldAccess):
+        # E.X: [E] = { ..., X: [E.X] ,... }
+        # field 목록 수집
+        self.record_fields.add(node.id)
+
+        field_map = dict()
+        field_map[node.id] = Type(node)
+        constraint1 = TypeEqualityConstraint(
+            Type(node.expression),
+            StructType(field_map)
+        )
+        #self.constraints.append(constraint1)
+        # record 에 absence 와 TypeVar 를 넣어주기 위해 지연
+        self.record_constraints.append(("field_access", constraint1))

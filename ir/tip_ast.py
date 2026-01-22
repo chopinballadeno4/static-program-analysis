@@ -361,6 +361,10 @@ class Struct(_Expression):
     # { Id : Exp, ... Id : Exp }
     fields: List[Field]
 
+    def __str__(self):
+        items = ', '.join(f"{f.key}: {f.Value}" for f in self.fields)
+        return f"{{{items}}}"
+
     def __eq__(self, other):
         if not isinstance(other, Struct):
             return False
@@ -374,6 +378,9 @@ class FieldAccess(_Expression):
     # Exp . Id
     expression: _Expression
     id: Id
+
+    def __str__(self):
+        return f"{self.expression}.{self.id}"
 
     def __eq__(self, other):
         if not isinstance(other, FieldAccess):
