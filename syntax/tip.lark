@@ -1,10 +1,14 @@
 // =======================
 // Program
+//
+// Prog -> Fun ... Fun
 // =======================
 prog: func*
 
 // =======================
 // Functions
+//
+// Fun -> Id(Id , ... , Id) { [ var Id , ... , Id; ] Stm return Exp; }
 // =======================
 func: id "(" ids ")" "{" stmts stmt_return "}"
 
@@ -12,6 +16,15 @@ func: id "(" ids ")" "{" stmts stmt_return "}"
 
 // =======================
 // Statements
+//
+// Stm -> Id = Exp;
+//   | output Exp;
+//   | Stm Stm
+//   | if (Exp) { Stm } [ else { Stm} ]
+//   | while (Exp) { Stm }
+//   | *Exp = Exp;
+//   | Id.Id = Exp;
+//   | (*Exp).Id = Exp;
 // =======================
 ?stmts: stmt+
 
@@ -29,6 +42,22 @@ stmt_return: "return" expr ";"
 
 // =======================
 // Expressions
+//
+// Int -> 0 | 1 | -1 | 2 | -2 | ...
+// Id -> x | y | z | ...
+// Exp -> Int
+//   | Id
+//   | Exp + Exp | Exp - Exp | Exp * Exp | Exp / Exp | Exp > Exp | Exp == Exp
+//   | (Exp)
+//   | input
+//   | Id(Exp , ... , Exp)
+//   | Exp(Exp , ... , Exp)
+//   | alloc Exp
+//   | &Id
+//   | *Exp
+//   | null
+//   | { Id: Exp , ... , Id: Exp }
+//   | Exp.Id
 // =======================
 ?expr: cmp
 
@@ -59,13 +88,10 @@ stmt_return: "return" expr ";"
     | "&" id -> prim_ref
     | "*" expr -> prim_deref
     | "null" -> prim_null
-    | "{" field ("," field)* "}" -> prim_struct
+    | "{" field ("," field)* "}" -> prim_record
 
 ?field: id ":" expr
 
-// =======================
-// Expressions
-// =======================
 int: INT
 id: VAR
 

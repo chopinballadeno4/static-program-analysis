@@ -16,46 +16,39 @@ from . import tip_constraint as constraint
 @dataclass
 class UnificationSolver:
     target_constraints: list[constraint.TypeEqualityConstraint]
+    record_fields: set[str]
 
+    unique_constraints: set[constraint.TypeEqualityConstraint] = field(init=False, default_factory=set)
     type_parent_relation: dict = field(init=False, default_factory=dict)
-    unique_constraints: list[constraint.TypeEqualityConstraint] = field(init=False, default_factory=list)
 
     def __post_init__(self):
-        # constraint 중 중복 제거
-        self.set_unique_constraints()
+        # equality constraints 중 중복 제거
+        self.unique_constraints = set(self.target_constraints)
         self.all_make_set(self.unique_constraints)
 
         for element in self.unique_constraints:
             self.unify(element.left, element.right)
 
-    def set_unique_constraints(self):
-        if len(self.target_constraints) > 0:
-            self.unique_constraints = []
-            for c in self.target_constraints:
-                if c not in self.unique_constraints:
-                    self.unique_constraints.append(c)
-
     def is_type_variable(self, t: constraint._Type):
         """
-
-        :param t:
-        :return:
+        type variable 인지 확인
+        proper type 종류
+        - pointer
+        - function
+        - record
+        - int
+        :return: True/False
         """
-        return not isinstance(t, (constraint.PointerType, constraint.FunctionType, constraint.IntType, constraint.StructType))
+        return not isinstance(t, (constraint.PointerType, constraint.FunctionType, constraint.IntType, constraint.RecordType))
 
     def check_type_constructor(self, t1: constraint._Type, t2: constraint._Type):
         """
-        :param t1:
-        :param t2:
+        t1, t2 가 모두 proper type 일 때 동일한 type constructor 를 갖는지 확인
         :return: (Boolean, _Type) = (동일 type constructor 유무, 타입 종류)
 
-        type constructors (e.g. ↑, →)
-        - ↑ (pointer type) 의 sub terms
-            - ↑[type]: type
-        - → (function type) 의 sub terms
-            - (type1, type2) -> return type3: type1, type2, type3
-        - { ... } (record type) 의 sub terms
-            - {Id:Type, ... Id:Type}: Id, .. Id
+        - ↑ (pointer type)
+        - → (function type): arity 가 동일
+        - { ... } (record type): Id 가 모두 동일
         """
         if isinstance(t1, constraint.PointerType) and isinstance(t2, constraint.PointerType):
             return True, constraint.PointerType
@@ -65,18 +58,18 @@ class UnificationSolver:
                 return True, constraint.FunctionType
             else:
                 return False, constraint.FunctionType
-        elif isinstance(t1, constraint.StructType) and isinstance(t2, constraint.StructType):
+        elif isinstance(t1, constraint.RecordType) and isinstance(t2, constraint.RecordType):
             # Id 가 모두 동일할 경우 같은 constructor
             if len(t1.field_map) != len(t2.field_map):
-                return False, constraint.StructType
+                return False, constraint.RecordType
 
             for k1 in t1.field_map.keys():
                 if k1 not in t2.field_map:
-                    return False, constraint.StructType
+                    return False, constraint.RecordType
 
-            return True, constraint.StructType
+            return True, constraint.RecordType
         else:
-            raise TypeAnalysisException("hihi")
+            return False, None
 
     def all_make_set(self, elements: list[constraint.TypeEqualityConstraint]):
         for item in elements:
@@ -91,6 +84,20 @@ class UnificationSolver:
         """
         if x not in self.type_parent_relation:
             self.type_parent_relation[x] = x
+
+        # spa p26 - "For each term τ we initially invoke MakeSet(τ)" τ 은 type 을 나타냄.
+        if isinstance(x, constraint.PointerType):
+            self.makeSet(x.base)
+        elif isinstance(x, constraint.FunctionType):
+            for t in x.params:
+                self.makeSet(t)
+            self.makeSet(x.result)
+        elif isinstance(x, constraint.RecursiveType):
+            self.makeSet(x.body)
+        elif isinstance(x, constraint.RecordType):
+            for t in x.field_map.values():
+                if not isinstance(t, constraint.AbsenceType) and not isinstance(t, constraint.TypeVar):
+                    self.makeSet(t)
 
     def find(self, x: constraint._Type):
         """
@@ -158,30 +165,32 @@ class UnificationSolver:
             elif not self.is_type_variable(xr) and self.is_type_variable(yr):
                 self.union(yr, xr)
             elif not self.is_type_variable(xr) and not self.is_type_variable(yr):
-                if self.check_type_constructor(xr, yr)[0]:
+                is_same_type_constructor: bool = self.check_type_constructor(xr, yr)[0]
+                proper_type: constraint._Type = self.check_type_constructor(xr, yr)[1]
+                if is_same_type_constructor:
                     # proper types same type constructor
                     self.union(xr, yr)
 
-                    if self.check_type_constructor(xr, yr)[1] is constraint.PointerType:
+                    # sub terms unify
+                    if proper_type is constraint.PointerType:
                         self.unify(xr.base, yr.base)
-                    elif self.check_type_constructor(xr, yr)[1] is constraint.FunctionType:
+                    elif proper_type is constraint.FunctionType:
                         for a, b in zip(xr.params, yr.params):
                             self.unify(a, b)
-                    elif self.check_type_constructor(xr, yr)[1] is constraint.StructType:
-                        # 추후 field 목록 순회하는 것으로 리팩토링 필요
-                        for k in xr.field_map:
+                    elif proper_type is constraint.RecordType:
+                        for k in self.record_fields:
                             xr_type = xr.field_map[k]
                             yr_type = yr.field_map[k]
                             if isinstance(xr_type, constraint.TypeVar) or isinstance(yr_type, constraint.TypeVar):
                                 continue
                             elif (isinstance(xr_type, constraint.AbsenceType) and not isinstance(yr_type, constraint.AbsenceType))\
                                     or (not isinstance(xr_type, constraint.AbsenceType) and isinstance(yr_type, constraint.AbsenceType)):
-                                raise TypeAnalysisException("unification 실패")
+                                raise TypeAnalysisException(f"record field 가 일치하지 않음. {xr_type} = {yr_type}")
                             else:
                                 self.unify(xr_type, yr_type)
                 else:
                     # proper types with other type constructor
-                    raise TypeAnalysisException("unification 실패")
+                    raise TypeAnalysisException(f"type constructor 가 동일하지 않음. {xr} = {yr}")
                     #return False
 
         return True

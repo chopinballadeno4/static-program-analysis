@@ -1,0 +1,27 @@
+foo() {
+    var a,b,c,d;
+    a = {f:3, g :17};
+    b = a.f;
+    c = {f: alloc 5, h :15};
+    d = c.f;
+
+    return t;
+}
+
+"""
+record 예제, Type Analysis 성공
+
+[foo] = () -> [t]
+[3] = int
+[17] = int
+[a] = [{f: 3, g: 17}]
+[b] = [a.f]
+[5] = int
+[alloc 5] = ↑[[5]]
+[15] = int
+[c] = [{f: alloc 5, h: 15}]
+[d] = [c.f]
+[{f: 3, g: 17}] = {f: [3], g: [17], h: *}
+[a] = {f: [a.f], h: typevar, g: typevar}
+[{f: alloc 5, h: 15}] = {f: [alloc 5], h: [15], g: *}
+[c] = {f: [c.f], h: typevar, g: typevar}

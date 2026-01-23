@@ -434,7 +434,7 @@ class Allocation(_Expression):
         return hash(self.expression)
 
 @dataclass
-class Struct(_Expression):
+class Record(_Expression):
     """
     { Id : Exp, ... Id : Exp }
     """
@@ -445,7 +445,7 @@ class Struct(_Expression):
         return f"{{{items}}}"
 
     def __eq__(self, other):
-        if not isinstance(other, Struct):
+        if not isinstance(other, Record):
             return False
         return self.fields == other.fields
 
@@ -573,7 +573,9 @@ class ToAst(Transformer):
         return FunctionCall(items[0], items[1])
 
     def prim_paren(self, items):
-        return Parenthesize(items[0])
+        # spa p23 - "parenthesized expression are not present in the abstract syntax"
+        #return Parenthesize(items[0])
+        return items[0]
 
     def prim_input(self, items):
         return Input()
@@ -590,8 +592,8 @@ class ToAst(Transformer):
     def stmt_deref_assign(self, items):
         return DereferenceAssignment(Dereference(items[0]), items[1])
 
-    def prim_struct(self, items):
-        return Struct(items)
+    def prim_record(self, items):
+        return Record(items)
 
     def factor_field(self, items):
         return FieldAccess(items[0], items[1])

@@ -1,0 +1,47 @@
+foo() {
+    x = {b: 42, c: 87};
+    y = x.a;
+
+    return t;
+}
+
+"""
+record 예제, Type Analysis 실패
+
+[foo] = () -> [t]
+[42] = int
+[87] = int
+[x] = [{b: 42, c: 87}]
+[y] = [x.a]
+[{b: 42, c: 87}] = {b: [42], c: [87], a: *}
+[x] = {a: [x.a], c: typevar, b: typevar}
+
+case1:
+[x] = [{b: 42, c: 87}]
+[{b: 42, c: 87}] = {b: [42], c: [87], a: *}
+[x] = {a: [x.a], c: typevar, b: typevar}
+
+case2:
+[x] = [{b: 42, c: 87}]
+[x] = {a: [x.a], c: typevar, b: typevar}
+[{b: 42, c: 87}] = {b: [42], c: [87], a: *}
+
+case3:
+[{b: 42, c: 87}] = {b: [42], c: [87], a: *}
+[x] = [{b: 42, c: 87}]
+[x] = {a: [x.a], c: typevar, b: typevar}
+
+case4:
+[{b: 42, c: 87}] = {b: [42], c: [87], a: *}
+[x] = {a: [x.a], c: typevar, b: typevar}
+[x] = [{b: 42, c: 87}]
+
+case5:
+[x] = {a: [x.a], c: typevar, b: typevar}
+[x] = [{b: 42, c: 87}]
+[{b: 42, c: 87}] = {b: [42], c: [87], a: *}
+
+case6:
+[x] = {a: [x.a], c: typevar, b: typevar}
+[{b: 42, c: 87}] = {b: [42], c: [87], a: *}
+[x] = [{b: 42, c: 87}]

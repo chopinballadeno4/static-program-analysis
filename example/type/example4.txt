@@ -29,7 +29,7 @@ main() {
 [alloc 0] = ↑[0]
 [q] = ↑[(*p) - 1]
 [q] = ↑[*q]
-[*p] = int
+[*p] = int # 위 중복
 [f] = [(*p) * (x(q, x))]
 [(*p) * (x(q, x))] = int
 [x(q, x)] = int
@@ -42,3 +42,12 @@ main() {
 [*p] = [0]
 [(*p) - 1] = int
 [foo(&n, foo)] = int
+
+아래를 제외하고는 모든 값은 int 이다.
+[[p]] = ↑int
+[[q]] = ↑int
+[[alloc 0]] = ↑int
+[[x]] = µt.(↑int, t)→int
+[[foo]] = µt.(↑int, t)→int
+[[&n]] = ↑int
+[[main]] = () → int

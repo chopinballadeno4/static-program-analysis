@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 
-from lark import Lark
+from lark import Lark, Tree
 from pathlib import Path
 from common.printer import print_constraints, print_type_parent_relation
 from type import tip_constraint as constraint
+from ir import tip_ast
 from ir.tip_ast import get_ast
 from type.tip_constraint import ConstraintCollector
 from type.tip_unification import UnificationSolver
@@ -16,13 +17,13 @@ class TipAnalysis:
     START = 'prog'
 
     syntax = (BASE_DIR / "syntax" / "tip.lark").read_text(encoding="utf-8")
-    program = (BASE_DIR / "example" / "type" / "example7.txt").read_text(encoding="utf-8").split('"""', 1)[0]
-    parser: Lark = None
-    cst = None
-    ast = None
-    constraints: list[constraint.TypeEqualityConstraint] = field(init=False)
-    record_fields: set[str] = field(init=False)
-    type_parent_relation: dict = field(init=False, default_factory=dict)
+    program = (BASE_DIR / "example" / "type" / "example12.txt").read_text(encoding="utf-8").split('"""', 1)[0]
+    parser: Lark = field(init=False, default=None)
+    cst: Tree = field(init=False, default=None)
+    ast: tip_ast.Program = field(init=False, default=None)
+    constraints: list[constraint.TypeEqualityConstraint] = field(init=False, default=None)
+    record_fields: set[str] = field(init=False, default=None)
+    type_parent_relation: dict = field(init=False, default=None)
 
     def set_parser(self):
         self.parser = Lark(
@@ -45,10 +46,8 @@ if __name__ == '__main__':
     constraint_collector = ConstraintCollector(analyzer.ast)
     analyzer.constraints = constraint_collector.constraints
     analyzer.record_fields = constraint_collector.record_fields
+    print_constraints(analyzer.constraints) # 콘솔 출력
 
-    unification_solver = UnificationSolver(analyzer.constraints)
+    unification_solver = UnificationSolver(analyzer.constraints, analyzer.record_fields)
     analyzer.type_parent_relation = unification_solver.type_parent_relation
-
-    # 콘솔 출력 ==========
-    print_constraints(analyzer.constraints)
-    print_type_parent_relation(analyzer.type_parent_relation)
+    print_type_parent_relation(analyzer.type_parent_relation) # 콘솔 출력
