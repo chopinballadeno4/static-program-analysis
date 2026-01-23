@@ -1,12 +1,21 @@
-from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Any
-
-from ir.tip_ast import _Expression, _Ast, Program, Function, Parenthesize, Reference, Dereference, Assignment, Id, Int, \
-    Field, Declaration, DereferenceAssignment, Return, Arithmetic, Comparison, If, While, Output, FunctionCall, Input, \
-    Null, Allocation, Struct, FieldAccess, FieldAssignment, DereferenceFieldAssignment
-
 """
+I: [[I]] = int
+E1 op E2: [[E1]] = [[E2]] = [[E1 op E2]] = int
+E1 == E2: [[E1]] = [[E2]] ∧ [[E1 == E2]] = int
+input: [[input]] = int
+X = E: [[X]] = [[E]]
+output E: [[E]] = int
+if (E) S: [[E]] = int
+if (E) S1 else S2: [[E]] = int
+while (E) S: [[E]] = int
+X(X1,...,Xn) { ...return E; }: [[X]] = ([[X1]],...,[[Xn]]) → [[E]]
+E(E1,...,En): [[E]] = ([[E1]],...,[[En]]) → [[E(E1,...,En)]]
+alloc E: [[alloc E]] = [[E]]
+&X: [[&X]] = [[X]]
+null: [[null]] = α
+*E: [[E]] = [[*E]]
+*E1 = E2: [[E1]] = [[E2]]
+
 Type -> int
 	| ↑ Type
 	| (Type, …, Type) -> Type
@@ -15,12 +24,16 @@ Type -> int
 	| {Id: Type, ... Id: Type}
 	| absence
 """
+from __future__ import annotations
+from dataclasses import dataclass, field
+from ir import tip_ast as ast
+
 class _Type:
     pass
 
 @dataclass
 class Type(_Type):
-    value: _Expression
+    value: ast._Expression
 
     def __str__(self):
         return f"[{self.value}]"
@@ -132,7 +145,7 @@ class TypeEqualityConstraint:
     right: Type
 
     def __str__(self):
-        return f"  - {self.left} = {self.right}"
+        return f"{self.left} = {self.right}"
 
 
 def removeParenthesize(expression):
@@ -142,67 +155,30 @@ def removeParenthesize(expression):
     :param expression: (( Exp ))
     :return: Exp
     """
-    if isinstance(expression, Parenthesize):
+    if isinstance(expression, ast.Parenthesize):
         return removeParenthesize(expression.expression)
     else:
         return expression
 
-
 @dataclass
-class ASTVisitor:
-    def visit(self, node: _Ast) -> Any:
-        """노드 타입에 따라 적절한 visit 메서드 호출"""
-        # 예: Function 노드 -> 'visit_Function' 찾기
-        method_name = f'visit_{node.__class__.__name__}'
+class ConstraintCollector:
+    target_ast: ast._Ast
 
-        # 해당 메서드가 있으면 그것을, 없으면 generic_visit 사용
-        visitor = getattr(self, method_name, lambda n: self.generic_visit(method_name))
+    record_fields: set[ast.Id] = field(init=False, default_factory=set)
+    record_constraints: list[tuple[str, TypeEqualityConstraint]] = field(init=False,default_factory=list)
+    constraints: list[TypeEqualityConstraint] = field(init=False, default_factory=list)
+
+    def __post_init__(self):
+        self.visit(self.target_ast)
+        # Record 타입은 field 수집을 위해 constraint 에 마지막에 추가
+        self.set_record_field()
+
+    def visit(self, node: ast._Ast):
+        # 노드 타입에 따라 적절한 visit 메서드 호출
+        method_name = f'visit_{node.__class__.__name__}'
+        visitor = getattr(self, method_name)
 
         return visitor(node)
-
-    def generic_visit(self, method_name: str) -> Any:
-        print('no node: ' + method_name)
-
-
-# 사용 예제: 모든 변수 이름 수집
-@dataclass
-class ConstraintCollector(ASTVisitor):
-    record_constraints: list[tuple[str, TypeEqualityConstraint]] = field(default_factory=list)
-    record_fields: set[Id] = field(default_factory=set)
-
-    constraints: list[TypeEqualityConstraint] = field(default_factory=list)
-    unique_constraints: list[TypeEqualityConstraint] = field(default_factory=list)
-    #unique_constraint_elements: list[Type] = field(default_factory=list)
-
-    def print_constraints(self):
-        # 수집한 constraints
-        print('[constraints]')
-        for c in self.constraints:
-            print(f" - {str(c)}")
-
-        # 중복 없는 constraints
-        print('\n[unique_constraints]')
-        for c in self.unique_constraints:
-            print(f" - {str(c)}")
-
-        # 중복 없는 type variable
-        # print('\n[unique_constraint_elements]')
-        # for c in self.unique_constraint_elements:
-        #     print(f" - {str(c)}")
-
-    def set_unique_constraints(self):
-        if len(self.constraints) > 0:
-            self.unique_constraints = []
-            for c in self.constraints:
-                if c not in self.unique_constraints:
-                    self.unique_constraints.append(c)
-
-            # self.unique_constraint_elements = []
-            # for c in self.unique_constraints:
-            #     if c.left not in self.unique_constraint_elements:
-            #         self.unique_constraint_elements.append(c.left)
-            #     if c.right not in self.unique_constraint_elements:
-            #         self.unique_constraint_elements.append(c.right)
 
     def set_record_field(self):
         for element in self.record_constraints:
@@ -229,12 +205,12 @@ class ConstraintCollector(ASTVisitor):
         for item in node:
             self.visit(item)
 
-    def visit_Program(self, node: Program):
+    def visit_Program(self, node: ast.Program):
         for func in node.functions:
             # function 단위로 타입 검사를 하기 때문에 여기서 전부 올바른지 확인해야 함
             self.visit(func)
 
-    def visit_Function(self, node: Function):
+    def visit_Function(self, node: ast.Function):
         # X(X1, ..., Xn) { ...return E; }: [X] = ([X1], ..., [Xn]) -> [E]
         params = []
         if node.parameters is not None:
@@ -272,7 +248,7 @@ class ConstraintCollector(ASTVisitor):
 
         self.visit(node.statements)
 
-    def visit_Reference(self, node: Reference):
+    def visit_Reference(self, node: ast.Reference):
         # &X: [&X] = ↑[X]
         # Reference type constraint 추가
         constraint1 = TypeEqualityConstraint(
@@ -281,7 +257,7 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints.append(constraint1)
 
-    def visit_Dereference(self, node: Dereference):
+    def visit_Dereference(self, node: ast.Dereference):
         # *E: [E] = ↑[*E]
         self.visit(node.expression)
 
@@ -292,10 +268,10 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints.append(constraint1)
 
-    def visit_Parenthesize(self, node: Parenthesize):
+    def visit_Parenthesize(self, node: ast.Parenthesize):
         self.visit(node.expression)
 
-    def visit_FunctionCall(self, node: FunctionCall):
+    def visit_FunctionCall(self, node: ast.FunctionCall):
         """
         [q] = ↑ int
         [x(q, x)] = int
@@ -322,7 +298,7 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints.append(constraint1)
 
-    def visit_Allocation(self, node: Allocation):
+    def visit_Allocation(self, node: ast.Allocation):
         # alloc E: [alloc E] = ↑[E]
         self.visit(node.expression)
 
@@ -333,7 +309,7 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints.append(constraint1)
 
-    def visit_Int(self, node: Int):
+    def visit_Int(self, node: ast.Int):
         # I: [I] = int
         # Int type constraint 추가
         constraint1 = TypeEqualityConstraint(
@@ -342,10 +318,10 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints.append(constraint1)
 
-    def visit_Id(self, node: Id):
+    def visit_Id(self, node: ast.Id):
         pass
 
-    def visit_Input(self, node: Input):
+    def visit_Input(self, node: ast.Input):
         # input: [input] = int
         # Input type constraint 추가
         constraint1 = TypeEqualityConstraint(
@@ -354,7 +330,7 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints.append(constraint1)
 
-    def visit_Assignment(self, node: Assignment):
+    def visit_Assignment(self, node: ast.Assignment):
         # X = E: [X] = [E]
         # Assignment type constraint 추가
         self.visit(node.expression)
@@ -365,10 +341,10 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints.append(constraint1)
 
-    def visit_Declaration(self, node: Declaration):
+    def visit_Declaration(self, node: ast.Declaration):
         pass
 
-    def visit_DereferenceAssignment(self, node: DereferenceAssignment):
+    def visit_DereferenceAssignment(self, node: ast.DereferenceAssignment):
         # *E1 = E2: [E1] = ↑[E2]
         self.visit(node.target)
         self.visit(node.expression)
@@ -380,7 +356,7 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints.append(constraint1)
 
-    def visit_If(self, node: If):
+    def visit_If(self, node: ast.If):
         # if(E) S: [E] = int
         # if(E) S1 else S2: [E] = int
         # If type constraint 추가
@@ -396,7 +372,7 @@ class ConstraintCollector(ASTVisitor):
         if node.false_statement != None:
             self.visit(node.false_statement)
 
-    def visit_Comparison(self, node: Comparison):
+    def visit_Comparison(self, node: ast.Comparison):
         # Comparison type constraint 추가
         self.visit(node.left_expression)
         self.visit(node.right_expression)
@@ -411,7 +387,7 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints += [constraint1, constraint2]
 
-    def visit_Arithmetic(self, node: Arithmetic):
+    def visit_Arithmetic(self, node: ast.Arithmetic):
         # Arithmetic type constraint 추가
         self.visit(node.left_expression)
         self.visit(node.right_expression)
@@ -431,7 +407,7 @@ class ConstraintCollector(ASTVisitor):
         )
         self.constraints += [constraint1, constraint2, constraint3]
 
-    def visit_Struct(self, node: Struct):
+    def visit_Struct(self, node: ast.Struct):
         # { X1:E1, ... Xn:En }: [{ X1:E1, ... Xn:En }] = { X1:[E1], ... Xn:[En] }
         field_map = dict()
 
@@ -451,7 +427,7 @@ class ConstraintCollector(ASTVisitor):
         # record 에 absence 와 TypeVar 을 넣어주기 위해 지연
         self.record_constraints.append(("struct", constraint1))
 
-    def visit_FieldAccess(self, node: FieldAccess):
+    def visit_FieldAccess(self, node: ast.FieldAccess):
         # E.X: [E] = { ..., X: [E.X] ,... }
         # field 목록 수집
         self.record_fields.add(node.id)

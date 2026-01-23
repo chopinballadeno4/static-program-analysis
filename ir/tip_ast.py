@@ -1,10 +1,11 @@
+"""
+https://lark-parser.readthedocs.io/en/latest/examples/advanced/create_ast.html#
+"""
 import sys
-
-from typing import List, Any
-from dataclasses import dataclass, field
+from typing import List
+from dataclasses import dataclass
 from enum import Enum
-
-from lark import Lark, ast_utils, Transformer, Visitor, Tree
+from lark import ast_utils, Transformer
 
 this_module = sys.modules[__name__]
 
@@ -29,7 +30,9 @@ class _Expression(_Ast):
 
 @dataclass
 class Id(_Expression):
-    # x, y, z, ...
+    """
+    x, y, z, ...
+    """
     name: str
 
     def __str__(self):
@@ -45,7 +48,9 @@ class Id(_Expression):
 
 @dataclass
 class Int(_Expression):
-    # 0, 1, -1, ...
+    """
+    0, 1, -1, ...
+    """
     value: int
 
     def __str__(self):
@@ -61,9 +66,14 @@ class Int(_Expression):
 
 @dataclass
 class Field(_Ast):
-    # Id : Exp
+    """
+    Id : Exp
+    """
     key: Id
     Value: _Expression
+
+    def __str__(self):
+        return f"{self.key}: {self.Value}"
 
     def __eq__(self, other):
         if not isinstance(other, Field):
@@ -75,8 +85,14 @@ class Field(_Ast):
 
 @dataclass
 class Declaration(_Statement):
-    # var Id
+    """
+    var Id;
+    """
     ids: List[Id]
+
+    def __str__(self):
+        ids_str = ', '.join(str(i) for i in self.ids)
+        return f"var {ids_str};"
 
     def __eq__(self, other):
         if not isinstance(other, Declaration):
@@ -88,9 +104,14 @@ class Declaration(_Statement):
 
 @dataclass
 class Assignment(_Statement):
-    # Id = Exp;
+    """
+    Id = Exp;
+    """
     id: Id
     expression: _Expression
+
+    def __str__(self):
+        return f"{self.id} = {self.expression};"
 
     def __eq__(self, other):
         if not isinstance(other, Assignment):
@@ -102,7 +123,9 @@ class Assignment(_Statement):
 
 @dataclass
 class Dereference(_Expression):
-    # * Exp
+    """
+    * Exp
+    """
     expression: _Expression
 
     def __str__(self):
@@ -118,9 +141,14 @@ class Dereference(_Expression):
 
 @dataclass
 class DereferenceAssignment(_Statement):
-    # *Exp = Exp;
+    """
+    *Exp = Exp;
+    """
     target: Dereference
     expression: _Expression
+
+    def __str__(self):
+        return f"{self.target} = {self.expression};"
 
     def __eq__(self, other):
         if not isinstance(other, DereferenceAssignment):
@@ -132,8 +160,13 @@ class DereferenceAssignment(_Statement):
 
 @dataclass
 class Return(_Statement):
-    # return Exp;
+    """
+    return Exp;
+    """
     expression: _Expression
+
+    def __str__(self):
+        return f"return {self.expression};"
 
     def __eq__(self, other):
         if not isinstance(other, Return):
@@ -145,11 +178,18 @@ class Return(_Statement):
 
 @dataclass
 class Function(_Ast):
-    # Id ( Id, ... Id ) { [ var id, ... Id ] stm return exp; }
+    """
+    Id ( Id, ... Id ) { [ var id, ... Id ] stm return exp; }
+    """
     name: Id
     parameters: List[Id]
     statements: List[_Statement]
     return_statement: Return
+
+    def __str__(self):
+        params = ', '.join(str(p) for p in self.parameters)
+        stmts = ' '.join(str(s) for s in self.statements)
+        return f"{self.name}({params}) {{ {stmts} {self.return_statement} }}"
 
     def __eq__(self, other):
         if not isinstance(other, Function):
@@ -162,8 +202,13 @@ class Function(_Ast):
 
 @dataclass
 class Program(_Ast):
-    # Fun, ... Fun
+    """
+    Fun, ... Fun
+    """
     functions: List[Function]
+
+    def __str__(self):
+        return '\n'.join(str(f) for f in self.functions)
 
     def __eq__(self, other):
         if not isinstance(other, Program):
@@ -175,7 +220,9 @@ class Program(_Ast):
 
 @dataclass
 class Arithmetic(_Expression):
-    # Exp + Exp
+    """
+    Exp + Exp | Exp - Exp | Exp * Exp | Exp / Exp
+    """
     left_expression: _Expression
     operator: ArithmeticOperator
     right_expression: _Expression
@@ -200,7 +247,9 @@ class Arithmetic(_Expression):
 
 @dataclass
 class Comparison(_Expression):
-    # Exp == Exp
+    """
+    Exp == Exp | Exp > Exp
+    """
     left_expression: _Expression
     operator: ComparisonOperator
     right_expression: _Expression
@@ -223,10 +272,17 @@ class Comparison(_Expression):
 
 @dataclass
 class If(_Statement):
-    # if(Exp) { Stm } [ else { Stm } ]
+    """
+    if(Exp) { Stm } [ else { Stm } ]
+    """
     condition: _Expression
     true_statement: _Statement
     false_statement: _Statement
+
+    def __str__(self):
+        if self.false_statement:
+            return f"if ({self.condition}) {{ {self.true_statement} }} else {{ {self.false_statement} }}"
+        return f"if ({self.condition}) {{ {self.true_statement} }}"
 
     def __eq__(self, other):
         if not isinstance(other, If):
@@ -239,9 +295,15 @@ class If(_Statement):
 
 @dataclass
 class While(_Statement):
-    # while ( Exp ) { Stm }
+    """
+    while ( Exp ) { Stm }
+    """
     condition: _Expression
     statements: List[_Statement]
+
+    def __str__(self):
+        stmts = ' '.join(str(s) for s in self.statements)
+        return f"while ({self.condition}) {{ {stmts} }}"
 
     def __eq__(self, other):
         if not isinstance(other, While):
@@ -253,8 +315,13 @@ class While(_Statement):
 
 @dataclass
 class Output(_Statement):
-    # output Exp;
+    """
+    output Exp;
+    """
     expression: _Expression
+
+    def __str__(self):
+        return f"output {self.expression};"
 
     def __eq__(self, other):
         if not isinstance(other, Output):
@@ -266,7 +333,9 @@ class Output(_Statement):
 
 @dataclass
 class FunctionCall(_Expression):
-    # Exp ( Exp, ... Exp )
+    """
+    Exp ( Exp, ... Exp )
+    """
     callee: _Expression
     expressions: List[_Expression]
 
@@ -284,7 +353,9 @@ class FunctionCall(_Expression):
 
 @dataclass
 class Parenthesize(_Expression):
-    # ( Exp )
+    """
+    ( Exp )
+    """
     expression: _Expression
 
     def __str__(self):
@@ -300,8 +371,9 @@ class Parenthesize(_Expression):
 
 @dataclass
 class Input(_Expression):
-    # input
-
+    """
+    input
+    """
     def __str__(self):
         return "input"
 
@@ -313,8 +385,9 @@ class Input(_Expression):
 
 @dataclass
 class Null(_Expression):
-    # null
-
+    """
+    null
+    """
     def __str__(self):
         return "null"
 
@@ -326,7 +399,9 @@ class Null(_Expression):
 
 @dataclass
 class Reference(_Expression):
-    # & Id
+    """
+    & Id
+    """
     id: Id
 
     def __str__(self):
@@ -342,7 +417,9 @@ class Reference(_Expression):
 
 @dataclass
 class Allocation(_Expression):
-    # alloc Exp
+    """
+    alloc Exp
+    """
     expression: _Expression
 
     def __str__(self):
@@ -358,7 +435,9 @@ class Allocation(_Expression):
 
 @dataclass
 class Struct(_Expression):
-    # { Id : Exp, ... Id : Exp }
+    """
+    { Id : Exp, ... Id : Exp }
+    """
     fields: List[Field]
 
     def __str__(self):
@@ -375,7 +454,9 @@ class Struct(_Expression):
 
 @dataclass
 class FieldAccess(_Expression):
-    # Exp . Id
+    """
+    Exp . Id
+    """
     expression: _Expression
     id: Id
 
@@ -392,10 +473,15 @@ class FieldAccess(_Expression):
 
 @dataclass
 class FieldAssignment(_Statement):
-    # Id . Id = Exp;
+    """
+    Id . Id = Exp;
+    """
     id: Id
     key: Id
     expression: _Expression
+
+    def __str__(self):
+        return f"{self.id}.{self.key} = {self.expression};"
 
     def __eq__(self, other):
         if not isinstance(other, FieldAssignment):
@@ -407,10 +493,15 @@ class FieldAssignment(_Statement):
 
 @dataclass
 class DereferenceFieldAssignment(_Statement):
-    # ( * Exp ) . Id = Exp;
+    """
+    ( * Exp ) . Id = Exp;
+    """
     target: Dereference
     key: Id
     expression: _Expression
+
+    def __str__(self):
+        return f"({self.target}).{self.key} = {self.expression};"
 
     def __eq__(self, other):
         if not isinstance(other, DereferenceFieldAssignment):
@@ -420,7 +511,7 @@ class DereferenceFieldAssignment(_Statement):
     def __hash__(self):
         return hash((self.target, self.key, self.expression))
 
-class ASTBuilder(Transformer):
+class ToAst(Transformer):
     def ids(self, items):
         return items
 
@@ -514,5 +605,9 @@ class ASTBuilder(Transformer):
     def prim_null(self, items):
         return Null()
 
-def getTransformer():
-    return ast_utils.create_transformer(this_module, ASTBuilder())
+def get_transformer():
+    return ast_utils.create_transformer(this_module, ToAst())
+
+def get_ast(cst):
+    transformer = get_transformer()
+    return transformer.transform(cst)

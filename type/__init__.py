@@ -1,3 +1,3 @@
-from . import tip_constraint, unification
+from . import tip_constraint, tip_unification
 
-__all__ = ["tip_constraint", "unification"]
+__all__ = ["tip_constraint", "tip_unification"]
