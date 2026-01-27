@@ -1,0 +1,18 @@
+baz() {
+    var x;
+    return &x;
+}
+
+main() {
+    var p;
+    p = baz();
+    *p = 1;
+    return *p;
+}
+
+"""
+limitation 예제
+
+null 포인터
+초기화되지않는 변수 0으로 나누기 escaping stack cell;
+*p denotes a stack cell

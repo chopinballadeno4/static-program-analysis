@@ -1,0 +1,11 @@
+f() {
+    var x;
+    x = alloc 17;
+    x = 42;
+    return x + 87;
+}
+
+"""
+limitation 예제, Type analysis 실패
+
+flow-insensitive 하기 때문에, return 에서 마지막 x 가 int 인지 모름

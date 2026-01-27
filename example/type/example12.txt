@@ -1,0 +1,15 @@
+foo() {
+    var p;
+    p = alloc null;
+    *p = p;
+
+    return 1;
+}
+
+"""
+recursive 예제
+
+[null] = ↑t
+[alloc null] = ↑[null]
+[p] = [alloc null]
+[p] = ↑[p]

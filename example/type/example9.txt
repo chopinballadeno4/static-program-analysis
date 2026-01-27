@@ -1,0 +1,14 @@
+f(x) {
+    y = 1;
+    return *x;
+}
+
+main() {
+    y = 1;
+    return f(alloc 1) + *(f(alloc(alloc 2)));
+}
+
+"""
+limitation 예제
+
+f 의 타입이 호출할때 모두 달라
