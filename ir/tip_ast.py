@@ -276,22 +276,24 @@ class If(_Statement):
     if(Exp) { Stm } [ else { Stm } ]
     """
     condition: _Expression
-    true_statement: _Statement
-    false_statement: _Statement
+    true_statements: List[_Statement]
+    false_statements: List[_Statement]
 
     def __str__(self):
-        if self.false_statement:
-            return f"if ({self.condition}) {{ {self.true_statement} }} else {{ {self.false_statement} }}"
-        return f"if ({self.condition}) {{ {self.true_statement} }}"
+        true_stmts = ' '.join(str(s) for s in self.true_statements)
+        if self.false_statements:
+            false_stmts = ' '.join(str(s) for s in self.false_statements)
+            return f"if ({self.condition}) {{ {true_stmts} }} else {{ {false_stmts} }}"
+        return f"if ({self.condition}) {{ {true_stmts} }}"
 
     def __eq__(self, other):
         if not isinstance(other, If):
             return False
         return (self.condition == other.condition and
-                self.true_statement == other.true_statement and self.false_statement == other.false_statement)
+                self.true_statements == other.true_statements and self.false_statements == other.false_statements)
 
     def __hash__(self):
-        return hash((self.condition, self.true_statement, self.false_statement))
+        return hash((self.condition, tuple(self.true_statements), tuple(self.false_statements)))
 
 @dataclass
 class While(_Statement):

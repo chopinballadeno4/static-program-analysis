@@ -372,9 +372,11 @@ class ConstraintCollector:
         )
         self.constraints.append(constraint1)
 
-        self.visit(node.true_statement)
-        if node.false_statement != None:
-            self.visit(node.false_statement)
+        for stmt in node.true_statements:
+            self.visit(stmt)
+        if node.false_statements:
+            for stmt in node.false_statements:
+                self.visit(stmt)
 
     def visit_Comparison(self, node: ast.Comparison):
         """
