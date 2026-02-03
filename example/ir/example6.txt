@@ -1,0 +1,18 @@
+main() {
+    var f;
+
+    if(f == 1) {
+        if(f == 3) {
+            f = 3;
+            f = f + 1;
+        }
+
+        f = 5;
+    } else {
+        while(f == 3) {
+            f = f - 1;
+        }
+    }
+
+    return f;
+}

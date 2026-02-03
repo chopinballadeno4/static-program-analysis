@@ -1,0 +1,11 @@
+main() {
+    var f;
+
+    if(f == 1) {
+        f = 2;
+    } else {
+        f = 3;
+    }
+
+    return f;
+}

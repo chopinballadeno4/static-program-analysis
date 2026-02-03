@@ -1,3 +1,3 @@
-from . import tip_ast
+from . import tip_ast, tip_cfg
 
-__all__ = ["tip_ast"]
+__all__ = ["tip_ast", "tip_cfg"]

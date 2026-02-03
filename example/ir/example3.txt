@@ -1,0 +1,11 @@
+main() {
+    var f;
+    f = 3;
+
+    while(f == 3) {
+        f = f + 1;
+        f = f + 2;
+    }
+
+    return f;
+}

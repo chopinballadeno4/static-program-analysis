@@ -13,3 +13,9 @@
 #### 3.3 Solving Constraints with Unification
 #### 3.4 Record Types
 #### 3.5 Limitations of the Type Analysis
+
+### chapter 4: Lattice Theory
+#### 4.1 Motivating Example: Sign Analysis
+#### 4.2 Lattices
+#### 4.3 Constructing Lattices
+#### 4.4 Equations, Monotonicity, and Fixed Points
