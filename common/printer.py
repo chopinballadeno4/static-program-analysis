@@ -1,3 +1,17 @@
+from lattice.tip_lattice import _Bottom
+
+
+def print_fixed_point_sign_analysis(fixed_point):
+    print('\n[Sign Analysis]')
+    for i, lattice in enumerate(fixed_point):
+        if i == 0: continue
+        if isinstance(lattice, _Bottom):
+            print(f"  S{i} = {lattice}")
+        else:
+            items = [f"{key} = {value.value}" for key, value in lattice.lattice.items()]
+            print(f"  S{i} = {{{', '.join(items)}}}")
+
+
 def print_constraints(constraints):
     print('[constraints]')
     for c in constraints:

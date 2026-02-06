@@ -2,12 +2,13 @@ from dataclasses import dataclass, field
 
 from lark import Lark, Tree
 from pathlib import Path
-from common.printer import print_constraints, print_type_parent_relation, print_cfg
+from common.printer import print_constraints, print_type_parent_relation, print_cfg, print_fixed_point_sign_analysis
 from type import tip_constraint as constraint
 from ir import tip_ast, tip_cfg
 from ir.tip_ast import get_ast
 from type.tip_constraint import ConstraintCollector
 from type.tip_unification import UnificationSolver
+from lattice.tip_lattice import FixedPointSolver
 from ir.tip_cfg import GraphBuilder
 
 # /spa 디렉터리 경로
@@ -18,7 +19,7 @@ class TipAnalysis:
     START = 'prog'
 
     syntax = (BASE_DIR / "syntax" / "tip.lark").read_text(encoding="utf-8")
-    program = (BASE_DIR / "example" / "ir" / "example6.txt").read_text(encoding="utf-8").split('"""', 1)[0]
+    program = (BASE_DIR / "example" / "lattice" / "example1.txt").read_text(encoding="utf-8").split('"""', 1)[0]
     parser: Lark = field(init=False, default=None)
     cst: Tree = field(init=False, default=None)
     ast: tip_ast.Program = field(init=False, default=None)
@@ -60,3 +61,7 @@ if __name__ == '__main__':
     graph_builder = GraphBuilder(analyzer.ast)
     analyzer.cfg = graph_builder.graph
     print_cfg(analyzer.cfg)
+
+    # Sign analysis ==========
+    fixed_point_solver = FixedPointSolver(analyzer.cfg)
+    print_fixed_point_sign_analysis(fixed_point_solver.fixed_point)
